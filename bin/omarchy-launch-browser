@@ -3,15 +3,7 @@
 # omarchy:summary=Launch the default browser as determined by the text/html handler.
 # omarchy:args=[url]
 
-# text/html holds the real browser, since x-scheme-handler/http(s)
-# points at omarchy-url-open
-default_browser=$(xdg-mime query default text/html)
-if [[ -z $default_browser ]]; then
-  default_browser=$(env -u BROWSER xdg-settings get default-web-browser)
-fi
-if [[ -z $default_browser ]]; then
-  default_browser=$(xdg-mime query default x-scheme-handler/https)
-fi
+default_browser=$(omarchy-cmd-default-browser)
 if [[ $default_browser == "omarchy-url-open.desktop" ]]; then
   # Never launch the URL dispatcher as a browser; it falls back to this script
   exit 1
@@ -26,9 +18,11 @@ else
   private_flag="--incognito"
 fi
 
-systemd-run --user --quiet --collect --unit="omarchy-browser-$(date +%s%N)" \
-  --property=StandardOutput=null --property=StandardError=null \
-  uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
+if ! omarchy-cmd-browser-handoff "$browser_exec" "${@/--private/$private_flag}"; then
+  systemd-run --user --quiet --collect --unit="omarchy-browser-$(date +%s%N)" \
+    --property=StandardOutput=null --property=StandardError=null \
+    uwsm-app -- "$browser_exec" "${@/--private/$private_flag}"
+fi
 
 url=""
 for argument in "$@"; do
